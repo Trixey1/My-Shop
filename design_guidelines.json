@@ -1,0 +1,96 @@
+{
+  "theme": "dark",
+  "archetype": "7 - Electric & Neon (Refined Cyberpunk)",
+  "brand_name": "RiftMarket",
+  "typography": {
+    "heading_font": "Unbounded",
+    "body_font": "Manrope",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "label": "text-xs uppercase tracking-[0.2em] font-bold"
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "#050505",
+      "surface": "#111111",
+      "surface_raised": "#1A1A1A"
+    },
+    "text": {
+      "primary": "#F5F5F5",
+      "secondary": "#A3A3A3",
+      "muted": "#737373"
+    },
+    "accent": {
+      "primary": "#FFE800",
+      "primary_hover": "#FFF04D",
+      "danger": "#FF3B30",
+      "success": "#39FF14"
+    },
+    "border": {
+      "subtle": "#262626",
+      "focus": "#FFE800",
+      "glass": "rgba(255, 255, 255, 0.1)"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing, Mobile-first responsive, Bento Grids for catalog",
+    "container_padding": "px-6 sm:px-12 lg:px-24",
+    "section_gap": "py-24 sm:py-32",
+    "grid_patterns": {
+      "game_catalog": "Bento Grid (grid-cols-1 md:grid-cols-12 gap-6) - Mix tall and wide cards. Span logic: Hero item col-span-full md:col-span-8 row-span-2, standard item col-span-4 row-span-1.",
+      "admin_dashboard": "Strict Grid Hierarchy (grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4) - Every pixel utilized, h-full on children."
+    }
+  },
+  "components_strategy": {
+    "buttons": "Flat background with 1px inner stroke, rounded-sm for a sharp gaming look. Hover state: slightly lighter accent, subtle glow drop-shadow. Active state must meet 3:1 contrast.",
+    "cards": "Surface color #111111, 1px border #262626, no shadow by default. On hover: border brightens to #FFE800/50, slight -translate-y-1 transform.",
+    "header": "Crystal Glassmorphism: bg-black/60, backdrop-blur-xl, border-b border-white/10. Sticky top positioning with z-50.",
+    "footer": "Solid deep black #000000, massive space py-24, huge 'RiftMarket' outline text at the bottom.",
+    "inputs": "Shadcn based, deep dark bg (#050505), border #262626, focus ring 2px #FFE800.",
+    "badges": "Cyberpunk terminal style: text-xs uppercase tracking-widest, bg-[#FFE800]/10 text-[#FFE800] border border-[#FFE800]/30 px-2 py-1."
+  },
+  "animations_and_interactions": {
+    "hover": "Explicit hover colors, subtle scale transform duration-200 ease-out.",
+    "entrance": "Framer motion staggered fade-up for grid items.",
+    "marquee": "Slow, organic continuous scrolling for 'Best Sellers' or 'Trust Indicators' using react-fast-marquee."
+  },
+  "media_and_assets": {
+    "icons_library": "@phosphor-icons/react",
+    "discord_icon_instructions": "Use standard react-icons/fa (FaDiscord) for the Discord logo.",
+    "image_urls": {
+      "hero_background": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/572a1775-30df-424f-9e02-86367e47d363/images/fefabdb4b21d65a650b621ea2b90c07dad8c07e3088085c5e9bf0d27522da195.png",
+        "description": "Abstract high-end 3D dimensional rift, matte black with cyber yellow energy",
+        "category": "hero"
+      },
+      "game_cover_1": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/572a1775-30df-424f-9e02-86367e47d363/images/e1112fce7b84149249c77878c02c976248785bd91cb0eef4589078af25b5022c.png",
+        "description": "3d cute blocky character holding glowing neon sword",
+        "category": "game_catalog"
+      },
+      "game_cover_2": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/572a1775-30df-424f-9e02-86367e47d363/images/78143779554dbf19b4ea3d2355426d08c11a43565454ce36c3991a45cf77159c.png",
+        "description": "3d cute blocky character sitting on glowing treasure chest",
+        "category": "game_catalog"
+      },
+      "game_cover_3": {
+        "url": "https://static.prod-images.emergentagent.com/jobs/572a1775-30df-424f-9e02-86367e47d363/images/721c4e210c1f541d3b168c738de41f7d4d98219158b9444ddf21e2652d729b48.png",
+        "description": "3d stylized glowing diamond floating over a pedestal",
+        "category": "game_catalog"
+      }
+    }
+  },
+  "specific_page_instructions": {
+    "landing_page": "Hero section must use the hero_background image with max overlay bg-black/50 (never go darker). Include large H1, prominent CTA. Use a Bento Grid for Game Catalog. Add a Marquee for Trust Indicators ('10k+ Orders Delivered', 'Secure via Dodo Payments', 'Instant Discord Delivery').",
+    "game_page": "Split layout: Sticky image/details on left, scrollable product list on right. Use Phosphor icons for stats (players, genre, release).",
+    "checkout_and_cart": "Cart as a slide-out sidebar (Sheet component from Shadcn). Checkout must integrate Dodo Payments UI securely.",
+    "order_confirmation": "Big success icon. MUST display Discord invite link explicitly (https://discord.gg/gvDs4AxP) and instruct user to paste their Order ID in the server to receive their items.",
+    "admin_panel": "Strict control room grid. Sidebar navigation. Data-dense tables for CRUD operations (Games, Products, Orders). Keep styling sharp, 1px borders, minimal padding."
+  },
+  "testing_requirements": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case representing their role (e.g., data-testid='add-to-cart-button')."
+}
