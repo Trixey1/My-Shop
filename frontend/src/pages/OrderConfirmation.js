@@ -111,7 +111,12 @@ export default function OrderConfirmation() {
             </li>
             <li className="flex gap-3">
               <span className="shrink-0 w-6 h-6 rounded-full bg-[#FFE800]/10 text-[#FFE800] flex items-center justify-center text-xs font-bold">2</span>
-              <span>Find your ticket in the support channel</span>
+              <span>
+                {order.discord_channel_url
+                  ? <>Your ticket is ready: <a href={order.discord_channel_url} target="_blank" rel="noopener noreferrer" className="text-[#FFE800] hover:underline font-medium">Open Ticket Channel</a></>
+                  : 'Find your ticket in the support channel'
+                }
+              </span>
             </li>
             <li className="flex gap-3">
               <span className="shrink-0 w-6 h-6 rounded-full bg-[#FFE800]/10 text-[#FFE800] flex items-center justify-center text-xs font-bold">3</span>

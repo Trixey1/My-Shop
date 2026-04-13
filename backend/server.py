@@ -471,9 +471,29 @@ async def create_order(req: CheckoutRequest):
     except Exception as e:
         logger.error(f"Discord notification error: {e}")
     
+    # Create Discord ticket channel via bot
+    ticket_info = {}
+    try:
+        from discord_bot import create_order_ticket
+        ticket_info = await create_order_ticket(order)
+        if ticket_info.get("channel_id"):
+            # Store ticket info on the order
+            await db.orders.update_one(
+                {"id": order["id"]},
+                {"$set": {
+                    "discord_channel_id": ticket_info["channel_id"],
+                    "discord_channel_url": ticket_info["channel_url"],
+                }}
+            )
+            order["discord_channel_id"] = ticket_info["channel_id"]
+            order["discord_channel_url"] = ticket_info["channel_url"]
+    except Exception as e:
+        logger.error(f"Discord ticket creation error: {e}")
+    
     return {
         "order": order,
         "checkout_url": None,
+        "discord_ticket": ticket_info,
         "message": "Order created successfully"
     }
 
