@@ -129,6 +129,8 @@ class CheckoutRequest(BaseModel):
     customer_name: str
     customer_email: str
     roblox_username: str = ""
+    discord_user_id: str = ""
+    discord_username: str = ""
 
 class OrderStatusUpdate(BaseModel):
     status: str
@@ -208,6 +210,109 @@ async def delete_proof(proof_id: str, request: Request):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Proof not found")
     return {"message": "Proof deleted"}
+
+# ---- Discord OAuth2 ----
+DISCORD_API_URL = "https://discord.com/api/v10"
+
+@api_router.get("/discord/auth-url")
+async def get_discord_auth_url():
+    """Generate Discord OAuth2 authorization URL."""
+    client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    redirect_uri = f"{frontend_url}/api/discord/callback"
+    
+    if not client_id:
+        raise HTTPException(status_code=500, detail="Discord OAuth not configured")
+    
+    import urllib.parse
+    params = urllib.parse.urlencode({
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "identify guilds.join",
+        "prompt": "consent",
+    })
+    return {"url": f"https://discord.com/oauth2/authorize?{params}"}
+
+@api_router.get("/discord/callback")
+async def discord_oauth_callback(code: str = ""):
+    """Handle Discord OAuth2 callback - exchange code for user info."""
+    from starlette.responses import RedirectResponse
+    
+    if not code:
+        return RedirectResponse(url="/checkout?discord_error=no_code")
+    
+    client_id = os.environ.get("DISCORD_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("DISCORD_CLIENT_SECRET", "").strip()
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    redirect_uri = f"{frontend_url}/api/discord/callback"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Exchange code for token
+            token_resp = await client.post(
+                f"{DISCORD_API_URL}/oauth2/token",
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": redirect_uri,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10,
+            )
+            
+            if token_resp.status_code != 200:
+                logger.error(f"Discord token exchange failed: {token_resp.status_code} {token_resp.text}")
+                return RedirectResponse(url="/checkout?discord_error=token_failed")
+            
+            token_data = token_resp.json()
+            access_token = token_data["access_token"]
+            
+            # Get user info
+            user_resp = await client.get(
+                f"{DISCORD_API_URL}/users/@me",
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            
+            if user_resp.status_code != 200:
+                return RedirectResponse(url="/checkout?discord_error=user_failed")
+            
+            user_data = user_resp.json()
+            discord_id = user_data["id"]
+            discord_username = user_data.get("global_name") or user_data.get("username", "Unknown")
+            discord_avatar = ""
+            if user_data.get("avatar"):
+                discord_avatar = f"https://cdn.discordapp.com/avatars/{discord_id}/{user_data['avatar']}.png"
+            
+            # Try to add user to guild (if guilds.join scope)
+            guild_id = os.environ.get("DISCORD_GUILD_ID", "").strip()
+            bot_token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+            if guild_id and bot_token:
+                try:
+                    await client.put(
+                        f"{DISCORD_API_URL}/guilds/{guild_id}/members/{discord_id}",
+                        headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+                        json={"access_token": access_token},
+                        timeout=10,
+                    )
+                    logger.info(f"Added {discord_username} to guild")
+                except Exception as e:
+                    logger.warning(f"Could not add to guild: {e}")
+            
+            import urllib.parse
+            params = urllib.parse.urlencode({
+                "discord_id": discord_id,
+                "discord_username": discord_username,
+                "discord_avatar": discord_avatar,
+            })
+            return RedirectResponse(url=f"/checkout?{params}")
+    
+    except Exception as e:
+        logger.error(f"Discord OAuth error: {e}")
+        return RedirectResponse(url="/checkout?discord_error=exception")
 
 # ---- Auth Routes ----
 @api_router.post("/auth/login")
@@ -447,6 +552,8 @@ async def create_order(req: CheckoutRequest):
         "customer_name": req.customer_name,
         "customer_email": req.customer_email,
         "roblox_username": req.roblox_username,
+        "discord_user_id": req.discord_user_id,
+        "discord_username": req.discord_username,
         "total_amount": round(total, 2),
         "status": "pending",
         "payment_id": None,
@@ -477,7 +584,6 @@ async def create_order(req: CheckoutRequest):
         from discord_bot import create_order_ticket
         ticket_info = await create_order_ticket(order)
         if ticket_info.get("channel_id"):
-            # Store ticket info on the order
             await db.orders.update_one(
                 {"id": order["id"]},
                 {"$set": {
@@ -487,6 +593,60 @@ async def create_order(req: CheckoutRequest):
             )
             order["discord_channel_id"] = ticket_info["channel_id"]
             order["discord_channel_url"] = ticket_info["channel_url"]
+            
+            # If Discord user is linked, set channel permissions + DM them
+            if req.discord_user_id:
+                bot_token = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+                guild_id = os.environ.get("DISCORD_GUILD_ID", "").strip()
+                if bot_token:
+                    try:
+                        async with httpx.AsyncClient() as hclient:
+                            # Set channel permissions for the user
+                            await hclient.put(
+                                f"https://discord.com/api/v10/channels/{ticket_info['channel_id']}/permissions/{req.discord_user_id}",
+                                headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+                                json={"allow": "3072", "type": 1},  # VIEW_CHANNEL + SEND_MESSAGES
+                                timeout=10,
+                            )
+                            # Mention them in the ticket
+                            await hclient.post(
+                                f"https://discord.com/api/v10/channels/{ticket_info['channel_id']}/messages",
+                                headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+                                json={"content": f"<@{req.discord_user_id}> Welcome! Your order ticket is ready."},
+                                timeout=10,
+                            )
+                            # DM the user
+                            dm_resp = await hclient.post(
+                                f"https://discord.com/api/v10/users/@me/channels",
+                                headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+                                json={"recipient_id": req.discord_user_id},
+                                timeout=10,
+                            )
+                            if dm_resp.status_code in (200, 201):
+                                dm_channel = dm_resp.json()
+                                items_text = "\n".join([f"- **{i['product_name']}** x{i['quantity']}" for i in order["items"]])
+                                await hclient.post(
+                                    f"https://discord.com/api/v10/channels/{dm_channel['id']}/messages",
+                                    headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+                                    json={
+                                        "content": f"Your order ticket has been created!",
+                                        "embeds": [{
+                                            "title": f"Order: {order['order_number']}",
+                                            "color": 16770048,
+                                            "fields": [
+                                                {"name": "Roblox", "value": order.get("roblox_username", "N/A"), "inline": True},
+                                                {"name": "Total", "value": f"${order['total_amount']:.2f}", "inline": True},
+                                                {"name": "Items", "value": items_text or "None", "inline": False},
+                                                {"name": "Ticket", "value": f"[Open Channel]({ticket_info['channel_url']})", "inline": False},
+                                            ],
+                                            "footer": {"text": "RiftMarket | Staff will deliver your items shortly"},
+                                        }],
+                                    },
+                                    timeout=10,
+                                )
+                                logger.info(f"DM sent to Discord user {req.discord_user_id}")
+                    except Exception as e:
+                        logger.error(f"Discord DM/permissions error: {e}")
     except Exception as e:
         logger.error(f"Discord ticket creation error: {e}")
     

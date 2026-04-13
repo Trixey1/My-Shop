@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingCart, Minus, Plus, Trash, CheckCircle, Warning, SpinnerGap } from '@phosphor-icons/react';
 import { FaDiscord } from 'react-icons/fa';
@@ -18,10 +18,43 @@ export default function CheckoutPage() {
   const [robloxUser, setRobloxUser] = useState(null);
   const [robloxValidating, setRobloxValidating] = useState(false);
   const [robloxError, setRobloxError] = useState('');
+  const [discordUser, setDiscordUser] = useState(null);
   const [emailValid, setEmailValid] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Handle Discord OAuth callback params
+  useEffect(() => {
+    const dId = searchParams.get('discord_id');
+    const dName = searchParams.get('discord_username');
+    const dAvatar = searchParams.get('discord_avatar');
+    if (dId && dName) {
+      setDiscordUser({ id: dId, username: dName, avatar: dAvatar || '' });
+      // Clean URL
+      window.history.replaceState({}, '', '/checkout');
+    }
+    // Also check localStorage for persisted discord link
+    const saved = localStorage.getItem('rift_discord_user');
+    if (saved && !dId) {
+      try { setDiscordUser(JSON.parse(saved)); } catch {}
+    }
+  }, [searchParams]);
+
+  // Persist discord user
+  useEffect(() => {
+    if (discordUser) localStorage.setItem('rift_discord_user', JSON.stringify(discordUser));
+  }, [discordUser]);
+
+  const linkDiscord = async () => {
+    try {
+      const { data } = await axios.get(`${API}/discord/auth-url`);
+      window.location.href = data.url;
+    } catch {
+      setError('Could not connect to Discord. Try again.');
+    }
+  };
 
   // Validate Roblox username
   const validateRoblox = useCallback(async (username) => {
@@ -76,6 +109,8 @@ export default function CheckoutPage() {
         customer_name: customerName.trim(),
         customer_email: customerEmail.trim(),
         roblox_username: robloxUser.name,
+        discord_user_id: discordUser?.id || '',
+        discord_username: discordUser?.username || '',
       });
       clearCart();
       navigate(`/order/${data.order.order_number}`);
@@ -194,15 +229,28 @@ export default function CheckoutPage() {
               </div>
 
               {/* Discord Link */}
-              <a
-                href="https://discord.gg/gvDs4AxP"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-2.5 rounded-sm bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#5865F2] hover:bg-[#5865F2]/20 transition-colors text-xs font-bold mb-4"
-                data-testid="link-discord-btn"
-              >
-                <FaDiscord size={16} /> Link Discord (Join Server)
-              </a>
+              {discordUser ? (
+                <div className="flex items-center gap-3 p-2.5 rounded-sm bg-[#5865F2]/10 border border-[#5865F2]/30 mb-4" data-testid="discord-linked">
+                  {discordUser.avatar ? (
+                    <img src={discordUser.avatar} alt="" className="w-8 h-8 rounded-full" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center"><FaDiscord size={16} className="text-white" /></div>
+                  )}
+                  <div>
+                    <p className="text-xs text-[#39FF14] font-bold">Discord Linked</p>
+                    <p className="text-sm text-[#F5F5F5] font-medium">{discordUser.username}</p>
+                  </div>
+                  <CheckCircle size={18} weight="fill" className="text-[#39FF14] ml-auto" />
+                </div>
+              ) : (
+                <button
+                  onClick={linkDiscord}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-sm bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#5865F2] hover:bg-[#5865F2]/20 transition-colors text-xs font-bold mb-4"
+                  data-testid="link-discord-btn"
+                >
+                  <FaDiscord size={16} /> Link Discord Account
+                </button>
+              )}
 
               {/* Totals */}
               <div className="border-t border-[#262626] pt-4 space-y-2">
