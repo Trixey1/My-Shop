@@ -1,34 +1,160 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* RiftMarket Global Styles */
+.glass-header {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.rift-badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  background: rgba(255, 232, 0, 0.1);
+  color: #FFE800;
+  border: 1px solid rgba(255, 232, 0, 0.3);
+  padding: 0.25rem 0.5rem;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.rift-card {
+  background: #111111;
+  border: 1px solid #262626;
+  transition: border-color 0.2s ease-out, transform 0.2s ease-out;
 }
 
-.App-link {
-    color: #61dafb;
+.rift-card:hover {
+  border-color: rgba(255, 232, 0, 0.5);
+  transform: translateY(-2px);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.rift-btn-primary {
+  background: #FFE800;
+  color: #050505;
+  font-weight: 700;
+  border: 1px solid rgba(255, 232, 0, 0.5);
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.rift-btn-primary:hover {
+  background: #FFF04D;
+  box-shadow: 0 0 20px rgba(255, 232, 0, 0.3);
+}
+
+.hero-overlay {
+  background: linear-gradient(to bottom, rgba(5,5,5,0.3) 0%, rgba(5,5,5,0.6) 50%, #050505 100%);
+}
+
+/* Animated Hero Background */
+.hero-animated-bg {
+  background: radial-gradient(ellipse at 50% 50%, #1a1400 0%, #0a0a00 30%, #050505 70%);
+  overflow: hidden;
+}
+
+/* Floating blocks */
+.floating-block {
+  position: absolute;
+  border-radius: 4px;
+  opacity: 0.15;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes floatUp1 {
+  0% { transform: translateY(0) translateX(0) rotate(0deg) scale(1); }
+  50% { transform: translateY(-80px) translateX(20px) rotate(45deg) scale(1.1); }
+  100% { transform: translateY(-160px) translateX(-10px) rotate(90deg) scale(0.9); }
+}
+@keyframes floatUp2 {
+  0% { transform: translateY(0) translateX(0) rotate(0deg); }
+  50% { transform: translateY(-120px) translateX(-30px) rotate(-60deg); }
+  100% { transform: translateY(-200px) translateX(15px) rotate(-120deg); }
+}
+@keyframes floatUp3 {
+  0% { transform: translateY(0) rotate(0deg) scale(0.8); }
+  50% { transform: translateY(-60px) rotate(30deg) scale(1.2); }
+  100% { transform: translateY(-140px) rotate(70deg) scale(0.9); }
+}
+@keyframes floatDiag {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(40px, -100px) rotate(180deg); }
+  100% { transform: translate(-20px, -180px) rotate(360deg); }
+}
+
+/* Pulsing glow orbs */
+@keyframes pulseGlow {
+  0% { transform: scale(1); opacity: 0.15; }
+  50% { transform: scale(1.5); opacity: 0.3; }
+  100% { transform: scale(1); opacity: 0.15; }
+}
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: pulseGlow ease-in-out infinite;
+}
+
+/* Particle dots */
+@keyframes particleRise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  20% { opacity: 0.8; }
+  80% { opacity: 0.6; }
+  100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
+}
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: #FFE800;
+  animation: particleRise linear infinite;
+}
+
+/* Grid scanline effect */
+@keyframes scanline {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(-100%); }
+}
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,232,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,232,0,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+}
+.hero-scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 200%;
+  background: linear-gradient(to bottom, transparent 0%, rgba(255,232,0,0.04) 50%, transparent 100%);
+  animation: scanline 8s linear infinite;
+}
+
+/* Bouncing character block */
+@keyframes characterBounce {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  30% { transform: translateY(-40px) rotate(3deg); }
+  50% { transform: translateY(-25px) rotate(-2deg); }
+  70% { transform: translateY(-35px) rotate(4deg); }
+}
+@keyframes characterShadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.3; }
+  30% { transform: scaleX(0.7); opacity: 0.15; }
+  50% { transform: scaleX(0.85); opacity: 0.2; }
+  70% { transform: scaleX(0.75); opacity: 0.15; }
+}
+.bouncing-character {
+  animation: characterBounce 2.5s ease-in-out infinite;
+}
+.character-shadow {
+  animation: characterShadow 2.5s ease-in-out infinite;
+}
+
+/* Marquee styling */
+.trust-marquee {
+  border-top: 1px solid #262626;
+  border-bottom: 1px solid #262626;
 }
