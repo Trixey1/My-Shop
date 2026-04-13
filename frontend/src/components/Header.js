@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, List, X } from '@phosphor-icons/react';
 import { useCart } from '../contexts/CartContext';
 import { useState } from 'react';
@@ -6,6 +6,14 @@ import { useState } from 'react';
 export default function Header() {
   const { totalItems, setIsOpen } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  const scrollToGames = (e) => {
+    if (location.pathname === '/') {
+      e.preventDefault();
+      document.getElementById('games')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <header className="glass-header sticky top-0 z-50" data-testid="main-header">
@@ -16,9 +24,13 @@ export default function Header() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-8" data-testid="desktop-nav">
+        <nav className="hidden md:flex items-center gap-6" data-testid="desktop-nav">
           <Link to="/" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors">Home</Link>
-          <a href="/#games" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors">Games</a>
+          <Link to="/" onClick={scrollToGames} className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors">Games</Link>
+          <Link to="/proofs" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors flex items-center gap-1">
+            Proofs <span className="text-[8px] px-1.5 py-0.5 rounded-sm bg-[#39FF14] text-[#050505] font-bold uppercase">Live</span>
+          </Link>
+          <Link to="/how-it-works" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors">Tutorial</Link>
           <a href="https://discord.gg/gvDs4AxP" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5] transition-colors">Discord</a>
         </nav>
 
@@ -36,7 +48,6 @@ export default function Header() {
             )}
           </button>
 
-          {/* Mobile menu toggle */}
           <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-[#F5F5F5]" data-testid="mobile-menu-toggle">
             {menuOpen ? <X size={22} weight="bold" /> : <List size={22} weight="bold" />}
           </button>
@@ -47,7 +58,8 @@ export default function Header() {
       {menuOpen && (
         <nav className="md:hidden border-t border-white/10 px-6 py-4 flex flex-col gap-3 bg-black/90" data-testid="mobile-nav">
           <Link to="/" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5]">Home</Link>
-          <a href="/#games" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5]">Games</a>
+          <Link to="/proofs" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5]">Proofs</Link>
+          <Link to="/how-it-works" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5]">Tutorial</Link>
           <a href="https://discord.gg/gvDs4AxP" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-[#A3A3A3] hover:text-[#F5F5F5]">Discord</a>
         </nav>
       )}

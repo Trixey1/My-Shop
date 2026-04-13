@@ -128,9 +128,86 @@ class CheckoutRequest(BaseModel):
     items: List[CartItem]
     customer_name: str
     customer_email: str
+    roblox_username: str = ""
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+class ProofCreate(BaseModel):
+    order_number: str = ""
+    product_name: str = ""
+    price: float = 0.0
+    image_url: str
+    game_name: str = ""
+
+# ---- Roblox Validation ----
+@api_router.post("/roblox/validate")
+async def validate_roblox_username(request: Request):
+    body = await request.json()
+    username = body.get("username", "").strip()
+    if not username or len(username) < 3 or len(username) > 20:
+        return {"valid": False, "error": "Username must be 3-20 characters"}
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://users.roblox.com/v1/usernames/users",
+                json={"usernames": [username], "excludeBannedUsers": False},
+                timeout=8,
+            )
+            data = resp.json()
+            if data.get("data") and len(data["data"]) > 0:
+                user = data["data"][0]
+                user_id = user["id"]
+                # Get avatar
+                avatar_resp = await client.get(
+                    f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=150x150&format=Png&isCircular=false",
+                    timeout=8,
+                )
+                avatar_url = ""
+                av_data = avatar_resp.json()
+                if av_data.get("data") and len(av_data["data"]) > 0:
+                    avatar_url = av_data["data"][0].get("imageUrl", "")
+                return {
+                    "valid": True,
+                    "user_id": user_id,
+                    "name": user["name"],
+                    "display_name": user.get("displayName", user["name"]),
+                    "avatar_url": avatar_url,
+                }
+            return {"valid": False, "error": "Roblox user not found"}
+    except Exception as e:
+        logger.error(f"Roblox API error: {e}")
+        return {"valid": False, "error": "Could not verify username. Try again."}
+
+# ---- Proofs Routes ----
+@api_router.get("/proofs")
+async def list_proofs(limit: int = 50):
+    proofs = await db.proofs.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return proofs
+
+@api_router.post("/admin/proofs")
+async def create_proof(proof: ProofCreate, request: Request):
+    await require_admin(request)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "order_number": proof.order_number,
+        "product_name": proof.product_name,
+        "price": proof.price,
+        "image_url": proof.image_url,
+        "game_name": proof.game_name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.proofs.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/admin/proofs/{proof_id}")
+async def delete_proof(proof_id: str, request: Request):
+    await require_admin(request)
+    result = await db.proofs.delete_one({"id": proof_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Proof not found")
+    return {"message": "Proof deleted"}
 
 # ---- Auth Routes ----
 @api_router.post("/auth/login")
@@ -309,9 +386,10 @@ async def send_discord_order_notification(order: dict):
     embed = {
         "embeds": [{
             "title": f"New Order: {order['order_number']}",
-            "color": 16770048,  # #FFE800 in decimal
+            "color": 16770048,
             "fields": [
                 {"name": "Customer", "value": f"{order['customer_name']}\n{order['customer_email']}", "inline": True},
+                {"name": "Roblox User", "value": order.get('roblox_username', 'N/A') or 'N/A', "inline": True},
                 {"name": "Total", "value": f"**${order['total_amount']:.2f}**", "inline": True},
                 {"name": "Status", "value": order["status"].upper(), "inline": True},
                 {"name": "Items", "value": items_text or "No items", "inline": False},
@@ -368,6 +446,7 @@ async def create_order(req: CheckoutRequest):
         "items": items_details,
         "customer_name": req.customer_name,
         "customer_email": req.customer_email,
+        "roblox_username": req.roblox_username,
         "total_amount": round(total, 2),
         "status": "pending",
         "payment_id": None,

@@ -184,15 +184,79 @@ class RiftMarketAPITester:
             if success:
                 self.log(f"   Updated product price")
 
+    def test_roblox_validation(self):
+        """Test Roblox username validation (NEW in iteration 3)"""
+        self.log("\n=== Testing Roblox Username Validation ===")
+        
+        # Test valid Roblox username
+        valid_data = {"username": "Roblox"}
+        success, response = self.run_test("Validate Roblox Username (Valid)", "POST", "roblox/validate", 200, valid_data)
+        if success:
+            if response.get('valid'):
+                self.log(f"   Valid user found: {response.get('name')} (ID: {response.get('user_id')})")
+                if response.get('avatar_url'):
+                    self.log(f"   Avatar URL: {response.get('avatar_url')}")
+            else:
+                self.log(f"   Validation failed: {response.get('error')}")
+        
+        # Test invalid Roblox username
+        invalid_data = {"username": "xyznotexist999"}
+        success, response = self.run_test("Validate Roblox Username (Invalid)", "POST", "roblox/validate", 200, invalid_data)
+        if success:
+            if not response.get('valid'):
+                self.log(f"   Invalid user correctly rejected: {response.get('error')}")
+            else:
+                self.log(f"   Unexpected: Invalid username was validated")
+        
+        # Test short username
+        short_data = {"username": "ab"}
+        success, response = self.run_test("Validate Roblox Username (Too Short)", "POST", "roblox/validate", 200, short_data)
+        if success and not response.get('valid'):
+            self.log(f"   Short username correctly rejected: {response.get('error')}")
+
+    def test_proofs_management(self):
+        """Test proofs CRUD operations (NEW in iteration 3)"""
+        self.log("\n=== Testing Proofs Management ===")
+        
+        # Get proofs (should be empty initially)
+        success, data = self.run_test("Get Proofs", "GET", "proofs", 200)
+        if success and isinstance(data, list):
+            self.log(f"   Found {len(data)} existing proofs")
+        
+        # Create a proof (admin only)
+        proof_data = {
+            "order_number": "RIFT-TEST123",
+            "product_name": "Test Item",
+            "price": 9.99,
+            "image_url": "https://example.com/proof.jpg",
+            "game_name": "Test Game"
+        }
+        success, response = self.run_test("Create Proof", "POST", "admin/proofs", 200, proof_data)
+        created_proof_id = None
+        if success:
+            created_proof_id = response.get('id')
+            self.log(f"   Created proof with ID: {created_proof_id}")
+        
+        # Get proofs again to verify creation
+        success, data = self.run_test("Get Proofs After Creation", "GET", "proofs", 200)
+        if success and isinstance(data, list):
+            self.log(f"   Now found {len(data)} proofs")
+        
+        # Delete the proof
+        if created_proof_id:
+            success, _ = self.run_test("Delete Proof", "DELETE", f"admin/proofs/{created_proof_id}", 200)
+            if success:
+                self.log("   Deleted test proof")
+
     def test_order_flow(self):
-        """Test order creation and management"""
+        """Test order creation and management (UPDATED for iteration 3)"""
         self.log("\n=== Testing Order Flow ===")
         
         if not self.created_product_id:
             self.log("❌ No product created, skipping order tests")
             return
         
-        # Create an order
+        # Create an order with Roblox username (NEW field)
         order_data = {
             "items": [
                 {
@@ -201,20 +265,26 @@ class RiftMarketAPITester:
                 }
             ],
             "customer_name": "Test Customer",
-            "customer_email": "test@example.com"
+            "customer_email": "test@example.com",
+            "roblox_username": "TestRobloxUser"  # NEW field in iteration 3
         }
-        success, response = self.run_test("Create Order", "POST", "orders/checkout", 200, order_data)
+        success, response = self.run_test("Create Order with Roblox Username", "POST", "orders/checkout", 200, order_data)
         if success:
             order = response.get('order', {})
             self.created_order_id = order.get('id')
             order_number = order.get('order_number')
+            roblox_username = order.get('roblox_username')
             self.log(f"   Created order: {order_number} (ID: {self.created_order_id})")
+            self.log(f"   Roblox username: {roblox_username}")
             
             # Get the order by order number
             if order_number:
                 success, data = self.run_test("Get Order", "GET", f"orders/{order_number}", 200)
                 if success:
                     self.log(f"   Retrieved order: {data.get('order_number')}")
+                    # Verify roblox_username is included
+                    if data.get('roblox_username'):
+                        self.log(f"   Order includes Roblox username: {data.get('roblox_username')}")
         
         # Test admin orders list
         success, data = self.run_test("List Admin Orders", "GET", "admin/orders", 200)
@@ -274,6 +344,8 @@ class RiftMarketAPITester:
             self.test_public_endpoints()
             self.test_admin_auth()
             self.test_admin_stats()
+            self.test_roblox_validation()  # NEW in iteration 3
+            self.test_proofs_management()  # NEW in iteration 3
             self.test_game_management()
             self.test_product_management()
             self.test_order_flow()
