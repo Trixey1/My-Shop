@@ -13,6 +13,7 @@ import uuid
 import bcrypt
 import jwt
 import secrets
+import httpx
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
@@ -292,6 +293,46 @@ async def delete_product(product_id: str, request: Request):
     await db.games.update_one({"id": product["game_id"]}, {"$inc": {"product_count": -1}})
     return {"message": "Product deleted"}
 
+# ---- Discord Webhook ----
+async def send_discord_order_notification(order: dict):
+    """Send a rich embed to Discord when an order is placed."""
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        logger.info("No DISCORD_WEBHOOK_URL configured, skipping notification")
+        return
+    
+    items_text = "\n".join([
+        f"**{item['product_name']}** x{item['quantity']} — ${item['line_total']:.2f}"
+        for item in order["items"]
+    ])
+    
+    embed = {
+        "embeds": [{
+            "title": f"New Order: {order['order_number']}",
+            "color": 16770048,  # #FFE800 in decimal
+            "fields": [
+                {"name": "Customer", "value": f"{order['customer_name']}\n{order['customer_email']}", "inline": True},
+                {"name": "Total", "value": f"**${order['total_amount']:.2f}**", "inline": True},
+                {"name": "Status", "value": order["status"].upper(), "inline": True},
+                {"name": "Items", "value": items_text or "No items", "inline": False},
+            ],
+            "footer": {"text": f"RiftMarket | {order['created_at'][:19]}"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
+        "username": "RiftMarket Orders",
+        "avatar_url": "https://static.prod-images.emergentagent.com/jobs/572a1775-30df-424f-9e02-86367e47d363/images/e1112fce7b84149249c77878c02c976248785bd91cb0eef4589078af25b5022c.png",
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(webhook_url, json=embed, timeout=10)
+            if resp.status_code in (200, 204):
+                logger.info(f"Discord notification sent for order {order['order_number']}")
+            else:
+                logger.warning(f"Discord webhook returned {resp.status_code}: {resp.text}")
+    except Exception as e:
+        logger.error(f"Failed to send Discord notification: {e}")
+
 # ---- Orders Routes ----
 def generate_order_number():
     return f"RIFT-{secrets.token_hex(4).upper()}"
@@ -338,28 +379,22 @@ async def create_order(req: CheckoutRequest):
     
     # Update sold counts and stock
     for item in req.items:
+        product_doc = await db.products.find_one({"id": item.product_id})
+        stock_dec = -item.quantity if product_doc and product_doc.get("stock", -1) != -1 else 0
         await db.products.update_one(
             {"id": item.product_id},
-            {"$inc": {"sold_count": item.quantity, "stock": -item.quantity if (await db.products.find_one({"id": item.product_id})).get("stock", -1) != -1 else 0}}
+            {"$inc": {"sold_count": item.quantity, "stock": stock_dec}}
         )
     
-    # Try Dodo Payments if configured
-    dodo_key = os.environ.get("DODO_PAYMENTS_API_KEY", "").strip()
-    checkout_url = None
-    if dodo_key:
-        try:
-            from dodopayments import DodoPayments
-            dodo_env = os.environ.get("DODO_PAYMENTS_ENVIRONMENT", "test_mode")
-            dodo_client = DodoPayments(bearer_token=dodo_key, environment=dodo_env)
-            # Note: In production, products would be created in Dodo dashboard
-            # For now, we just return the order for Discord-based delivery
-            logger.info(f"Dodo Payments configured but using Discord delivery flow")
-        except Exception as e:
-            logger.warning(f"Dodo Payments error: {e}")
+    # Send Discord notification (async, non-blocking)
+    try:
+        await send_discord_order_notification(order)
+    except Exception as e:
+        logger.error(f"Discord notification error: {e}")
     
     return {
         "order": order,
-        "checkout_url": checkout_url,
+        "checkout_url": None,
         "message": "Order created successfully"
     }
 
